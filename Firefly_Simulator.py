@@ -7,13 +7,25 @@ from io import StringIO
 INITIATEEXIT = False
 
 
-def getRandomTime():
+def getRandomTime(max=1.5):
 
-    toReturn = round(random.randint(12,75) * 0.02, 2)
+    maxInt = int(max/0.02)
+    toReturn = round(random.randint(12, maxInt) * 0.02, 2)
     print(toReturn)
     return toReturn
 
     #return min + round(max * random.random(), 2)
+
+
+def rotatePolygon(polygon=[], angle=0, point=(0, 0)):
+    newPolygon = []
+    for i in polygon:
+        x, y = i[0] - point[0], i[1] - point[1]
+        x1 = x * math.cos(angle) - y * math.sin(angle) + point[0]
+        y1 = x * math.sin(angle) + y * math.cos(angle) + point[1]
+        newPolygon.append((x1, y1))
+
+    return newPolygon
 
 
 def randomRotatePolygon(polygon=[], point=(0, 0)):
@@ -96,6 +108,7 @@ class Firefly:
         self.collisionRectangle = None
         self.percetptionRect = None
         self.neighbour = None
+        self.static = False
 
         self.debug = True
         self.drawSurface = pygame.Surface((600, 600), pygame.SRCALPHA)
@@ -107,7 +120,8 @@ class Firefly:
 
         t.Thread(target=self.synchronize).start()
 
-    def computeGeometry(self):
+
+    def computeGeometry(self, angle=None):
 
         radius = self.precerptionRadius
         perceptionRect = pygame.Rect(
@@ -121,7 +135,11 @@ class Firefly:
             perceptionRect.topright,
             self.pos
         ]
-        self.perceptionPolygon = randomRotatePolygon(PerceptionTriangle, self.pos)
+        if angle != None:
+            self.static = True
+            self.perceptionPolygon = rotatePolygon(PerceptionTriangle, angle, self.pos)
+        else:
+            self.perceptionPolygon = randomRotatePolygon(PerceptionTriangle, self.pos)
         self.collisionRectangle = pygame.Rect(
             self.pos[0] - self.fireflyRadius,
             self.pos[1] - self.fireflyRadius,
@@ -170,10 +188,14 @@ class Firefly:
         neighbourStates = []
         totalNumTrues, neighbourClock = 0, 0
         neighbourTries = 0
+        calculateClock = False
 
         lookForSync = False
         syncStates = []
         syncTries = 0
+        syncedOnce = False
+
+        neighbourClockRecords = []
 
         while not(INITIATEEXIT):
 
@@ -189,10 +211,11 @@ class Firefly:
                         if self.debug: print("Neighbour locked!")
                         break
                 else:
-                    neighbourTries += 1
-                    if neighbourTries >= 100:
-                        neighbourTries = 0
-                        self.computeGeometry()
+                    if not(self.static):
+                        neighbourTries += 1
+                        if neighbourTries >= 100:
+                            neighbourTries = 0
+                            self.computeGeometry()
             else:
                 state = neighbour.isFlashing
                 if len(neighbourStates) == 2:
@@ -203,12 +226,17 @@ class Firefly:
                     if neighbourStates == [True, False]:
                         count = False
                         if self.debug: print("Stopped Counting")
+                        calculateClock = True
                     totalNumTrues += 1
+                    if self.debug: print("Total Trues -", totalNumTrues)
 
-                if not(neighbourClock) and neighbourStates and not(count) and not(lookForSync):
+                #if not(neighbourClock) and neighbourStates and not(count) and not(lookForSync):
+                if calculateClock:
+                    totalNumTrues += 6
                     neighbourClock = round(totalNumTrues * 0.02, 2)
-                    if self.debug: print("Neighbour's clock -", neighbourClock )
+                    if self.debug: print("Neighbour's clock -", neighbourClock , "Trues -", totalNumTrues)
                     lookForSync = True
+                    calculateClock = False
 
                 if neighbourStates == [False, True] and not(totalNumTrues):
                     count = True
@@ -224,14 +252,35 @@ class Firefly:
 
                     if syncStates == [[False, False], [True, True]]:
                         self.internalClock = neighbourClock
+                        if self.debug: print("Done")
+                        syncedOnce = True
                         lookForSync = False
-                        print("Done")
 
                     syncTries += 1
                     if lookForSync and syncTries >= 1500:
                         syncTries = 0
-                        self.internalClock = getRandomTime()
+                        self.internalClock = getRandomTime(max=0.4)
                         if self.debug: print("Tries exceeded -", self.internalClock)
+
+                    if syncedOnce:
+                        if len(neighbourClockRecords) == 2:
+                            neighbourClockRecords.remove(neighbourClockRecords[0])
+                        nc = neighbour.internalClock
+                        if neighbourClockRecords and nc not in neighbourClockRecords:
+                            if self.debug: print("Found change in neighbour's internal clock")
+                            #Reset back to tracking phase
+                            if self.debug: print("Resetting...")
+                            count = False
+                            neighbourStates = []
+                            totalNumTrues, neighbourClock = 0, 0
+                            neighbourTries = 0
+                            calculateClock = False
+                            
+                            syncStates = []
+                            syncTries = 0
+                            if self.debug: print("Reset complete reverting back to tracking phase")
+                        else:
+                            neighbourClockRecords.append(nc)
 
             e = time.time()
             dt = round(e - s, 2)
@@ -307,6 +356,7 @@ fireflies = [
     )
 for i in fireflies:
     t.Thread(target=i.percieve, args=(fireflies,)).start()"""
+fireflies[0].computeGeometry(round(math.pi/2, 2))
 t.Thread(target=fireflies[0].percieve, args=(fireflies,)).start()
 
 lr = LinkRenderer(fireflies)
