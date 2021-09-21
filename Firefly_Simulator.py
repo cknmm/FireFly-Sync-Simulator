@@ -5,14 +5,12 @@ from io import StringIO
 
 
 INITIATEEXIT = False
-OLD = sys.stdout
-new = StringIO()
-sys.stdout = new
 
 
 def getRandomTime():
 
     toReturn = round(random.randint(12,75) * 0.02, 2)
+    print(toReturn)
     return toReturn
 
     #return min + round(max * random.random(), 2)
@@ -161,7 +159,7 @@ class Firefly:
 
     def percieve(self, flies=[]):
 
-        global INITIATEEXIT, OLD
+        global INITIATEEXIT
 
         flies = list(flies) 
         flies.remove(self)
@@ -207,7 +205,7 @@ class Firefly:
                         if self.debug: print("Stopped Counting")
                     totalNumTrues += 1
 
-                if not(neighbourClock) and neighbourStates and not(count):
+                if not(neighbourClock) and neighbourStates and not(count) and not(lookForSync):
                     neighbourClock = round(totalNumTrues * 0.02, 2)
                     if self.debug: print("Neighbour's clock -", neighbourClock )
                     lookForSync = True
@@ -218,20 +216,19 @@ class Firefly:
                     if self.debug: print("Counting internal clock :", totalNumTrues)
 
                 if lookForSync:
-                    if self.debug: print("Syncing", syncStates)
                     state = neighbour.isFlashing
                     if len(syncStates) == 2:
                         syncStates.remove(syncStates[0])
                     syncStates.append([self.isFlashing, state])
+                    if self.debug: print("Syncing", syncStates)
 
                     if syncStates == [[False, False], [True, True]]:
                         self.internalClock = neighbourClock
                         lookForSync = False
-                        if self.debug: print("Done")
-                        if self.debug: sys.stdout = OLD; print("Done")
+                        print("Done")
 
                     syncTries += 1
-                    if lookForSync and syncTries >= 150:
+                    if lookForSync and syncTries >= 1500:
                         syncTries = 0
                         self.internalClock = getRandomTime()
                         if self.debug: print("Tries exceeded -", self.internalClock)
@@ -307,9 +304,10 @@ fireflies = [
             random.randint(0, 560),
             random.randint(0, 560)
         ))
-    )"""
+    )
 for i in fireflies:
-    t.Thread(target=i.percieve, args=(fireflies,)).start()
+    t.Thread(target=i.percieve, args=(fireflies,)).start()"""
+t.Thread(target=fireflies[0].percieve, args=(fireflies,)).start()
 
 lr = LinkRenderer(fireflies)
 
